@@ -1,4 +1,6 @@
 # Lab 3 and Lab 4: Raft
+To get started go to [https://classroom.github.com/a/SC5O431X](https://classroom.github.com/a/SC5O431X)
+to create a repository and get the template code.
 
 ## Introduction
 In this lab you will implement a replicated state machine using Raft as the
