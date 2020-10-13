@@ -79,8 +79,11 @@ We will be using information in the submission form to grade your lab, determine
 late days, etc. It is therefore crucial that you fill this out correctly.
 
 Github username: (e.g., apanda)
+
 NYU NetID: (e.g., ap191)
+
 NYU N#:
+
 Name: 
 
 ### Citations
@@ -129,8 +132,11 @@ We will be using information in the submission form to grade your lab, determine
 late days, etc. It is therefore crucial that you fill this out correctly.
 
 Github username: (e.g., apanda)
+
 NYU NetID: (e.g., ap191)
+
 NYU N#:
+
 Name: 
 
 ### Citations
