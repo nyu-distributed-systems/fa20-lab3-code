@@ -1,196 +1,61 @@
-# Lab 2: Time both virtual and physical
-
-**NOTE:** [Hand-in instructions](#handing-in) are at the end of this document. 
-It is very important you follow these instructions. Failure to do so might result
-in receiving 0 on this lab.
+# Lab 3 and Lab 4: Raft
 
 ## Introduction
-In this lab you will implement Lamport clocks, vector clocks and briefly
-examine the challenges with synchronizing real clocks. Please make sure
-you have read the papers corresponding with this before beginning the lab.
-The instructions that follow are not nearly as detailed as the instructions
-for Lab 1, this is because we assume that you already know Elixir, and we
-only provide information about the code when it is particularly different
-from what you have seen in the past. You might find the
-[notes](https://cs.nyu.edu/~apanda/classes/fa20/notes/elixir-help.pdf)
-for the Elixir help-session, specifically the bit about 
-[Map.merge/3](https://hexdocs.pm/elixir/Map.html#merge/3)
-useful.
+In this lab you will implement a replicated state machine using Raft as the
+underlying consensus protocol. The RSM you are implementing models a queue
+supporting enqueue and dequeue operations. The RSM also provides a no-op
+operation that is used for testing and forcing commits.
 
-All your work in this lab goes into `apps/lab2/time_lab.ex`.
+**NOTE:** This project is significantly more complex than Lab 1 and 2. Despite
+being split across 2 labs, we expect that you will need to spend significant time
+on completing this. You should start early, and really spend some time thinking
+about how to best implement this code. The stencil code itself is very long, and
+reading through it will probably take a while.
 
-## Getting Started
-To create a repository for Lab 2 go to the URL 
-[https://classroom.github.com/a/KjZvH2rD](https://classroom.github.com/a/KjZvH2rD)
-after logging into Github. This will present a button you can use to accept
-the assignment, which in turn will create a repository for you under the
-`nyu-distributed-systems`. 
+**NOTE 2** Figure 2 in the [Raft paper](https://cs.nyu.edu/~apanda/classes/fa20/papers/ongaro14in.pdf)
+is exactly what your implementation should do. If in doubt, you should figure out
+how and why you implementation differs from what is described in Figure 2.
 
-## Data Types in Elixir
-Sometimes it is useful to have named fields rather than tuples. In Elixir
-[defstruct](https://elixir-lang.org/getting-started/structs.html) provides
-a way of doing this, though structures are just glorified maps. Unfortunately
-a structure is associated with a single module.
+You do not need to implement:
+* Snapshotting or anything else to reduce log sizes.
+* Reconfiguration or mechanisms to change membership.
 
-As a result `time_lab.ex` consists of several (3) modules:
-*  [`VirtualTimeMessage`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L1) which has a structure
-   consisting of a Lamport clock and vector clock, and is used by the first
-   two parts of this assignment.
+For this project you can safely assume that the network does not lose packets and
+that messages between pairs of processes are delivered in order.
 
-* [`PhysicalTimeMessage`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L35) which has a structure used
-  for physical time synchronization.
+## Lab 3: Get the RSM Working without Leader Election (AppendEntries)
 
-* [`TimeLab`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L70) where all your logic should go.
+For Lab 3 you must write all of the code necessary to launch a cluster with
+a pre-appointed leader and allow clients to commit changes. In particular this
+requires
 
-## Application Events and Failure Model
+* Implementing AppendEntries so the leader can replicate log entries across the
+  cluster.
+* Making sure followers respond to AppendEntries appropriately.
+* Making sure the leader can decide when an entry has been committed. The leader
+  **should only** respond to the client once the appropriate operation has been
+  applied to the queue, which of course requires that the corresponding log entry
+  be committed. To help with this LogEntry's store information about the client
+  that invoked a request.
+* Making sure that followers apply committed log entries eventually.
 
-In this assignment we only consider two application events: message sends, and
-message receives. This is common practice for distributed logging.
+While you do not need to implement Heartbeats as a part of this portion, we strongly
+recommend doing so since the logic closely mirrors bits you will be implementing.
 
-You **do not** need to consider message losses in this project.
+Also, you can start with the assumption that all processes are either leaders or
+followers, and hence not worry about candidates in this part of the lab.
 
-## Part 1: Lamport Clocks (35%)
-For this part you need to implement two functions:
-
-* [`update_lamport_clock/2`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L98): This function is
-  called whenever a process receives a message. The `current` argument is the
-  processes current Lamport clock, while the `received` argument contains the
-  clock attached to the received message.
-* [`update_lamport_clock/1`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L111) is called before the
-  process sends a message. Similar to `update_lamport_clock/2` the `current`
-  argument is the current process clock.
-  
-Both functions should return the updated value of the process clock. The function [`lamport_ping_server/1`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L117) demonstrates a case where
-they are used.
-
-### Testing
-You can test this part of the code by running
+### Testing Lab 3
+We have test cases for Lab 3 in [`test/lab3_test.exs`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/test/lab3_test.exs)
+which can be run using:
 
 ```
-mix test test/virtual_clock_test.exs:10:50
+> mix test test/lab3_test.exs
 ```
 
-This syntax just means run all tests in the `virtual_clock_test.ex` file
-between lines 10 and 50. You might need to adjust this if you add or remove
-tests.
+You are definitely encouraged to add additional tests.
 
-## Part 2: Vector Clocks (50%)
-### 2A. Updating Vector Clocks
-
-For this part you need to update vector clocks when messages are received
-or sent.
-
-#### Updates when messages are received
-When a message is received a process that uses vector clocks will call
-[`combine_vector_clocks`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L220) which gets two maps as
-input: `current` representing the vector clock at the current process, and
-`received` representing the vector clock attached to the received message.
-
-Updating a vector requires iterating through the vector, and the Lab code
-accomplishes this task by using `Map.merge`. The `Map.merge` call in 
-`combine_vector_clocks` will call [`combine_component/2`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L208)
-with a single component from each vector clock. You need to implement your
-update algorithm in this function. The `combine_component` function should
-return a non-negative integer.
-
-#### Updates when messages are sent
-The [`update_vector_clock/2`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L234) function is called whenever
-a process sends a message. The two arguments are `proc`, the process
-identifier and `clock` the current vector clock. This function should
-return an updated vector clock.
-
-### 2B: Comparing Vector Clocks
-You also need to implement the [compare_vectors/2](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L277)
-function for comparing two vector clocks `v1` and `v2`. This function should
-return:
-
-* `:before` (`@before`) if `v1` happens before `v2`.
-* `:after` (`@hafter`) if `v2` happens before `v1`.
-* `:concurrent` (`@concurrent`) if `v1` and `v2` are incomparable.
-
-In order to get `compare_vectors/2` working you will also need to fill out
-[`compare_component/2`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L265).
-
-### Testing
-Assuming you have Lamport clocks done, you can test this 
-part of the code by running. Otherwise read through the tests
-to find and pass the appropriate line numbers.
-
-```
-mix test test/virtual_clock_test.exs
-```
-
-### 2C: Implement your lecture 2 example
-The last question you had to look at for lecture 2 was:
-> Consider a distributed system with three processes, where each process must send at
-> least **one** message to one other process. Construct a scenario (a schedule/sequence
-> of events) where at least a pair of events happen **concurrently**.
-
-Implement your example in the `test/virtual_clock_test.exs` file.
-
-Provide line numbers for your implementation here: **FILL THIS IN**
-
-## Physical Clocks (15%)
-This last part briefly looks at how to synchronize physical times
-between processes. Traditionally this is done by having a client
-request the current time from a server, and then update its own
-clock based on the value returned by the server. 
-
-In this case we are not going to implement the entire NTP protocol
-and will make several simplifying assumptions:
-* Clients and servers agree on frequency: there is no skew.
-* Servers respond to messages as soon as they receive them, in terms
-  of Figure 3 in the paper this means $T_{i-2} = T_{i-1}$.
-* We only have one server, so we are not doing any filtering, etc.
-
-
-There are two main challenges with the simple synchronization:
-* First, messages take time to go between client and server. To
-  address this problem clients try to measure message delays between
-  them and the server. This however requires figuring out message delays.
-* Second, message delays vary between messages, and might even change
-  drastically over time. This necessitates an algorithm that can 
-  estimate a time averaged estimate.
-  
-A common algorithm used for this purpose is an exponential moving
-average. You can see an implementation of this in the
-[`measure_rtt_internal/3`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L412) function. This function
-is trying to compute the estimated round-trip time between client and server,
-i.e., the time taken between when a client sends a request and receives a
-response. You should carefully read this function and understand what is going
-on.
-
-Now use what you learnt to fill out the 
-[`compute_current_time/3`](https://github.com/nyu-distributed-systems/fa20-lab2-code/blob/master/apps/lab2/lib/time_lab.ex#L529). This function takes three
-arguments:
-* `request_time` is the time when the client sent out a request to the server.
-  Note, you can determine how long passed between the request being sent and
-  a response being received using `now() - request_time`. However, this
-  does not tell you how much time has passed since the server responded
-  (why?).
-* `server_time` is the response the server sent for the current time.
-* `current_rtt` is an estimate for the round-trip time (see above) between
-   client and server.
-   
-`compute_current_time/3` should return a tuple: 
-`{current time, estimated RTT}`.
-
-### Testing
-You can test this part of the code by running
-```
-mix test test/time_lab_test.exs
-```
-
-A note on testing: while the test will identify any egregious bugs
-in your code, they are necessarily limited due to how physical time
-works. As a result, you should both use the tests, and think through 
-your implementation. If you have any concerns you can use the space below
-to add an explanation about how you arrived at your implementation:
-
-#### Implementation Notes
-**FILL THIS IF DESIRED**
-
-## Handing In 
+## Handing in Lab 3
 
 **WARN WARN WARN** PLEASE READ THESE INSTRUCTIONS CAREFULLY. YOU MAY **RECEIVE
 A 0 (ZERO) IF YOU DO NOT**, EVEN IF YOU COMPLETE EVERYTHING THUS FAR.
@@ -205,7 +70,7 @@ To handin this assignment:
   implementation notes to Part 3, and filling out the information below.
 * Commit and push all your changes.
 * Use `git rev-parse --short HEAD` to get a commit hash for your changes.
-* Fill out the [submission form](https://forms.gle/XkoRAkGhANGegdzi9) with
+* Fill out the [submission form](https://forms.gle/Rj2JZc1P4ubcHfGv8) with
   all of the information requested.
 
 We will be using information in the submission form to grade your lab, determine
@@ -217,3 +82,122 @@ NYU N#:
 Name: 
 
 ### Citations
+
+## Lab 3 Grading
+We will be grading Lab 3 and Lab 4 at the same time. Half (50%) of your Lab 3
+grade will be determined by how the final Lab 4 handing works with the lab 3
+tests, while the rest will be determined the handin for Lab 3. Lab 3 largely
+exists to act as a forcing function fo your to being working on this lab.
+
+## Lab 4: Get Leader Election Working
+In this second part you will complete your implementation so that leader election
+works correctly. This requires implementing everything required to handle 
+`RequestVote` calls correctly, and for getting logs to match.
+
+
+### Testing Lab 4
+We have test cases for Lab 4 in [`test/lab4test.exs`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/test/lab4_test.exs)
+which can be run using:
+
+```
+> mix test test/lab4_test.exs
+```
+
+You are definitely encouraged to add additional tests.
+
+## Handing in Lab 4
+
+**WARN WARN WARN** PLEASE READ THESE INSTRUCTIONS CAREFULLY. YOU MAY **RECEIVE
+A 0 (ZERO) IF YOU DO NOT**, EVEN IF YOU COMPLETE EVERYTHING THUS FAR.
+
+
+To handin this assignment:
+
+* First make sure `mix test` shows that you pass all tests. If not be aware
+  that you will loose points.
+* Second, make sure you have updated this `README.md` file. This requires
+  providing line numbers for the test you added in Part 2, potentially adding
+  implementation notes to Part 3, and filling out the information below.
+* Commit and push all your changes.
+* Use `git rev-parse --short HEAD` to get a commit hash for your changes.
+* Fill out the [submission form](https://forms.gle/WVUUbXBMPXCcZASK8) with
+  all of the information requested.
+
+We will be using information in the submission form to grade your lab, determine
+late days, etc. It is therefore crucial that you fill this out correctly.
+
+Github username: (e.g., apanda)
+NYU NetID: (e.g., ap191)
+NYU N#:
+Name: 
+
+### Citations
+
+## Hints and Code Structure
+
+The stencil code for this project is quite extensive. We recommend reading and
+understanding it, particularly the helper functions before beginning work. 
+Below we provide a few notes that might help you as you look through the code:
+
+* We represent RPC calls and their returns using Elixir structs. These structs
+  are defined in [lib/messages.ex](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/messages.ex)
+  and you can see examples of their use in [raft.ex](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L596).
+  
+  Utility functions in [raft.ex](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex)
+  including `get_last_log_index`, `get_last_log_term`, `save_election_timer`, etc.
+  demonstrate how you can manipulate these structs.
+
+* Per-process state is defined in [raft.ex](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L22)
+  which also provides a [description](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L37)
+  of how the log is stored. Please make sure you read and understand that comment
+  since it is important that you either (a) follow that log structure or (b)
+  appropriately change the utility functions.
+  
+* Log entries can be committed by calling the [`commit_log_entry`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L128)
+  or [`commit_log_index`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L157)
+  function.
+
+* You should use the [`save_heartbeat_timer`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L331)
+  and [`save_election_timer`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L331) functions
+  to store handles to the appropriate timers in process state. These handles are
+  of course useful when cancelling timer.
+  
+* You are **required** to implement the [`reset_election_timer`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L331)
+ and [`reset_heartbeat_time`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L331).
+ Each should cancel any existing timer, and set a new one. You **must** use 
+ `state.heartbeat_timeout` as the heartbeat timeout, and call 
+ [`get_election_time`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L316)
+ to get the **election** timeout.
+ 
+* The code is structured so that each processes code appears as a state machine:
+  * A process can be in one of three states: [`follower`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L394),
+    [`leader`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L525) and
+    [`candidate`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L686).
+    Each has a function that you should fill out with appropriate information.
+    
+    Of course some of the logic is shared across the three, and so you should make
+    use of additional private functions to avoid code duplication.
+    
+    Each of these functions take both process state (`state`) and an additional 
+    `extra_state` parameter that you can use to track anything specific to a particular
+    type of process. For example, a candidate can use the `extra_state` parameter to
+    track the number of votes it has received.
+    
+  * We provide three functions [`become_leader`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L509),
+    [`become_follower`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L378),
+    and [`become_candidate`](https://github.com/nyu-distributed-systems/fa20-lab3-code/blob/master/apps/lab3/lib/raft.ex#L670)
+    that should be called when transitioning from one process state to another. You
+    should used these functions to implement any one-time processing required,
+    for instance you might want to add logic in `become_leader` to (a) start a
+    heartbeat timer, and (b) assert leadership using an empty AppendEntry message.
+    
+    You should make sure your transitions call these `become_*` functions. For
+    example when implementing the election timeout on a follower your code should
+    roughly do the following:
+    
+    `follower` -(timer)-> `become_candidate` -----> `candidate`
+    
+    You might want to send out `RequestVote` requests in `become_candidate`.
+
+* Finally, start early, read through the code you are given, and write plan things
+  out on paper before you start writing code.
