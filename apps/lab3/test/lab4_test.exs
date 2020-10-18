@@ -6,7 +6,7 @@ defmodule Lab4Test do
   import Kernel,
     except: [spawn: 3, spawn: 1, spawn_link: 1, spawn_link: 3, send: 2]
 
-  test "Leader election eventuall produces a leader" do
+  test "Leader election eventually produces a leader" do
     Emulation.init()
     Emulation.append_fuzzers([Fuzzers.delay(2)])
 
@@ -139,6 +139,12 @@ defmodule Lab4Test do
     client =
       spawn(:client, fn ->
         view = [:a, :b, :c]
+        # Wait a tiny bit initially.
+        receive do
+        after
+          20 -> :ok
+        end
+
         view |> Enum.map(fn x -> send(x, :whois_leader) end)
 
         original_leader =
