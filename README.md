@@ -1,5 +1,5 @@
 # Lab 3 and Lab 4: Raft
-To get started go to [https://classroom.github.com/a/SC5O431X](https://classroom.github.com/a/SC5O431X)
+To get started go to [https://classroom.github.com/a/Wsj-WCCp](https://classroom.github.com/a/Wsj-WCCp)
 to create a repository and get the template code.
 
 ## Introduction
@@ -72,7 +72,7 @@ To handin this assignment:
   implementation notes to Part 3, and filling out the information below.
 * Commit and push all your changes.
 * Use `git rev-parse --short HEAD` to get a commit hash for your changes.
-* Fill out the [submission form](https://forms.gle/Rj2JZc1P4ubcHfGv8) with
+* Fill out the [submission form](https://forms.gle/GmjyEesJSpkQoaLd7) with
   all of the information requested.
 
 We will be using information in the submission form to grade your lab, determine
@@ -125,7 +125,7 @@ To handin this assignment:
   implementation notes to Part 3, and filling out the information below.
 * Commit and push all your changes.
 * Use `git rev-parse --short HEAD` to get a commit hash for your changes.
-* Fill out the [submission form](https://forms.gle/WVUUbXBMPXCcZASK8) with
+* Fill out the [submission form](https://forms.gle/pY9KSPsK1RyTTK7DA) with
   all of the information requested.
 
 We will be using information in the submission form to grade your lab, determine
