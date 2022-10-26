@@ -72,7 +72,7 @@ To handin this assignment:
   implementation notes to Part 3, and filling out the information below.
 * Commit and push all your changes.
 * Use `git rev-parse --short HEAD` to get a commit hash for your changes.
-* Fill out the [submission form](https://forms.gle/GmjyEesJSpkQoaLd7) with
+* Fill out the [submission form](https://forms.gle/NCQRZVUn16Vt4mqf9) with
   all of the information requested.
 
 We will be using information in the submission form to grade your lab, determine
@@ -125,7 +125,7 @@ To handin this assignment:
   implementation notes to Part 3, and filling out the information below.
 * Commit and push all your changes.
 * Use `git rev-parse --short HEAD` to get a commit hash for your changes.
-* Fill out the [submission form](https://forms.gle/pY9KSPsK1RyTTK7DA) with
+* Fill out the [submission form](https://forms.gle/3dGQTKPeJwLKWgib8) with
   all of the information requested.
 
 We will be using information in the submission form to grade your lab, determine
