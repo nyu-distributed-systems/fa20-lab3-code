@@ -1,5 +1,5 @@
 # Lab 3 and Lab 4: Raft
-To get started go to [https://classroom.github.com/a/Wsj-WCCp](https://classroom.github.com/a/Wsj-WCCp)
+To get started go to [https://classroom.github.com/a/t5hPLITs](https://classroom.github.com/a/t5hPLITs)
 to create a repository and get the template code.
 
 ## Introduction
